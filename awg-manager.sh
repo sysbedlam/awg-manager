@@ -115,15 +115,17 @@ create_server() {
     PUB_KEY=$(echo "$PRIV_KEY" | awg pubkey)
 
     # Random AmneziaWG params (like official app)
-    JC=$(random_int 3 10)
-    JMIN=$(random_int 40 80)
-    JMAX=$(random_int $((JMIN + 20)) 150)
-    S1=$(random_int 15 50)
-    S2=$(random_int 15 50)
-    H1=$(random_int 5 2147483647)
-    H2=$(random_int 5 2147483647)
-    H3=$(random_int 5 2147483647)
-    H4=$(random_int 5 2147483647)
+    JC=$(random_int 3 8)
+    JMIN=$(random_int 10 50)
+    JMAX=$(random_int $((JMIN + 10)) 100)
+    S1=$(random_int 15 100)
+    S2=$(random_int 15 100)
+
+    # H1-H4 must not overlap — split 32-bit space into 4 non-overlapping zones
+    H1=$(random_int 5 1000000000)
+    H2=$(random_int 1000000001 2000000000)
+    H3=$(random_int 2000000001 3000000000)
+    H4=$(random_int 3000000001 4294967290)
 
     # Random port
     PORT=$(random_int 10000 65000)
