@@ -222,11 +222,12 @@ EOF
     echo ""
     print_ok "Сервер создан!"
     echo ""
-    echo "  Публичный ключ : ${GREEN}$PUB_KEY${NC}"
-    echo "  Порт           : ${GREEN}$PORT${NC}"
-    echo "  Туннель        : ${GREEN}$SERVER_IP/24${NC}"
-    echo "  Jc/Jmin/Jmax   : ${GREEN}$JC / $JMIN / $JMAX${NC}"
-    echo "  S1/S2          : ${GREEN}$S1 / $S2${NC}"
+    printf "  Публичный ключ : ${GREEN}$PUB_KEY${NC}\n"
+    printf "  Порт           : ${GREEN}$PORT${NC}\n"
+    printf "  Туннель        : ${GREEN}$SERVER_IP/24${NC}\n"
+    printf "  Jc/Jmin/Jmax   : ${GREEN}$JC / $JMIN / $JMAX${NC}\n"
+    printf "  S1/S2          : ${GREEN}$S1 / $S2${NC}\n"
+    printf "  H1/H2/H3/H4   : ${GREEN}$H1 / $H2 / $H3 / $H4${NC}\n"
     echo ""
 }
 
