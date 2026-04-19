@@ -2,7 +2,7 @@
 # awg-manager - AmneziaWG server manager for OpenWrt
 # https://github.com/sysbedlam/awg-manager
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 CLIENTS_DIR="/etc/awg-manager/clients"
 CONFIG_FILE="/etc/awg-manager/server.conf"
 AWG_IFACE="awg_srv"
@@ -52,7 +52,8 @@ get_server_ip() {
 random_int() {
     local min=$1
     local max=$2
-    awk -v min=$min -v max=$max -v seed=$(date +%N%s | tr -d '%') 'BEGIN{srand(seed+OFMT+0); print int(min+rand()*(max-min+1))}'
+    local rand=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+    echo $(( min + rand % (max - min + 1) ))
 }
 
 random_token() {
