@@ -9,7 +9,7 @@ echo ""
 echo "Устанавливаю awg-manager..."
 
 # Download
-if ! wget -O "$INSTALL_PATH" "$SCRIPT_URL" 2>/dev/null; then
+if ! wget -O "$INSTALL_PATH" "${SCRIPT_URL}?$(date +%s)" 2>/dev/null; then
     echo "[✗] Ошибка загрузки скрипта"
     exit 1
 fi
