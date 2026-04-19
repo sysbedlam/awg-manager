@@ -124,9 +124,21 @@ create_server() {
     # Random port
     PORT=$(random_int 10000 65000)
 
-    # Server tunnel IP
-    SERVER_IP="10.0.0.1"
-    SUBNET="10.0.0.0/24"
+    # Random subnet 172.16.x.x
+    RAND_A=$(random_int 16 31)
+    RAND_B=$(random_int 1 254)
+    DEFAULT_SUBNET="172.$RAND_A.$RAND_B"
+    SERVER_IP="${DEFAULT_SUBNET}.1"
+
+    echo ""
+    print_info "Предлагаемая подсеть: ${GREEN}${DEFAULT_SUBNET}.0/24${NC} (сервер ${DEFAULT_SUBNET}.1)"
+    printf "Использовать её? (Enter = да, или введи своё начало, например 192.168.55): "
+    read CUSTOM_SUBNET
+
+    if [ -n "$CUSTOM_SUBNET" ]; then
+        SERVER_IP="${CUSTOM_SUBNET}.1"
+        DEFAULT_SUBNET="$CUSTOM_SUBNET"
+    fi
 
     print_info "Создание интерфейса $AWG_IFACE..."
 
@@ -182,6 +194,7 @@ SERVER_PUB_KEY=$PUB_KEY
 SERVER_PRIV_KEY=$PRIV_KEY
 SERVER_PORT=$PORT
 SERVER_IP=$SERVER_IP
+SUBNET_BASE=$DEFAULT_SUBNET
 JC=$JC
 JMIN=$JMIN
 JMAX=$JMAX
@@ -216,9 +229,10 @@ EOF
 # ─────────────────────────────────────────
 
 get_next_ip() {
+    . $CONFIG_FILE
     local i=2
     while [ $i -le 254 ]; do
-        local ip="10.0.0.$i"
+        local ip="${SUBNET_BASE}.$i"
         if ! grep -r "Address = $ip" $CLIENTS_DIR/ > /dev/null 2>&1; then
             echo $ip
             return
