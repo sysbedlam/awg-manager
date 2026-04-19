@@ -8,12 +8,12 @@ CONFIG_FILE="/etc/awg-manager/server.conf"
 AWG_IFACE="awg_srv"
 
 # Colors
-RED='\e[0;31m'
-GREEN='\e[0;32m'
-YELLOW='\e[1;33m'
-BLUE='\e[0;34m'
-CYAN='\e[0;36m'
-NC='\e[0m'
+RED=$(printf '\033[0;31m')
+GREEN=$(printf '\033[0;32m')
+YELLOW=$(printf '\033[1;33m')
+BLUE=$(printf '\033[0;34m')
+CYAN=$(printf '\033[0;36m')
+NC=$(printf '\033[0m')
 
 # ─────────────────────────────────────────
 # HELPERS
