@@ -73,7 +73,11 @@ install_awg() {
         return 0
     fi
 
-    if ! sh <(wget -O - https://raw.githubusercontent.com/Slava-Shchipunov/awg-openwrt/refs/heads/master/amneziawg-install.sh); then
+    if ! sh <(wget -O - https://raw.githubusercontent.com/Slava-Shchipunov/awg-openwrt/refs/heads/master/amneziawg-install.sh) << 'ANSWERS'
+y
+n
+ANSWERS
+    then
         print_err "Ошибка установки"
         return 1
     fi
