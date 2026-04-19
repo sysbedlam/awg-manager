@@ -8,31 +8,31 @@ CONFIG_FILE="/etc/awg-manager/server.conf"
 AWG_IFACE="awg_srv"
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+RED='\e[0;31m'
+GREEN='\e[0;32m'
+YELLOW='\e[1;33m'
+BLUE='\e[0;34m'
+CYAN='\e[0;36m'
+NC='\e[0m'
 
 # ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
 
 print_banner() {
-    echo ""
-    echo "${CYAN}╔═══════════════════════════════════════╗${NC}"
-    echo "${CYAN}║        awg-manager v${VERSION}            ║${NC}"
-    echo "${CYAN}║   AmneziaWG Manager for OpenWrt       ║${NC}"
-    echo "${CYAN}║  github.com/sysbedlam/awg-manager     ║${NC}"
-    echo "${CYAN}╚═══════════════════════════════════════╝${NC}"
-    echo ""
+    printf "\n"
+    printf "${CYAN}╔═══════════════════════════════════════╗${NC}\n"
+    printf "${CYAN}║        awg-manager v${VERSION}            ║${NC}\n"
+    printf "${CYAN}║   AmneziaWG Manager for OpenWrt       ║${NC}\n"
+    printf "${CYAN}║  github.com/sysbedlam/awg-manager     ║${NC}\n"
+    printf "${CYAN}╚═══════════════════════════════════════╝${NC}\n"
+    printf "\n"
 }
 
-print_ok()   { echo "${GREEN}[✓]${NC} $1"; }
-print_err()  { echo "${RED}[✗]${NC} $1"; }
-print_info() { echo "${BLUE}[i]${NC} $1"; }
-print_warn() { echo "${YELLOW}[!]${NC} $1"; }
+print_ok()   { printf "${GREEN}[✓]${NC} $1\n"; }
+print_err()  { printf "${RED}[✗]${NC} $1\n"; }
+print_info() { printf "${BLUE}[i]${NC} $1\n"; }
+print_warn() { printf "${YELLOW}[!]${NC} $1\n"; }
 
 check_root() {
     if [ "$(id -u)" != "0" ]; then
@@ -388,7 +388,7 @@ list_clients() {
     for f in $CLIENTS_DIR/*.conf; do
         name=$(basename $f .conf)
         ip=$(grep "^Address" $f | awk '{print $3}' | cut -d/ -f1)
-        echo "  ${GREEN}$i.${NC} $name  ${BLUE}($ip)${NC}"
+        printf "  ${GREEN}$i.${NC} $name  ${BLUE}($ip)${NC}\n"
         i=$((i+1))
     done
     echo ""
@@ -445,9 +445,9 @@ show_config() {
 
     echo ""
     print_info "Конфиг $name:"
-    echo "${CYAN}────────────────────────────────────────${NC}"
+    printf "${CYAN}────────────────────────────────────────${NC}\n"
     cat "$conf"
-    echo "${CYAN}────────────────────────────────────────${NC}"
+    printf "${CYAN}────────────────────────────────────────${NC}\n"
 }
 
 # ─────────────────────────────────────────
@@ -548,17 +548,17 @@ server_status() {
 main_menu() {
     while true; do
         print_banner
-        echo "  ${GREEN}1.${NC} Установить AmneziaWG"
-        echo "  ${GREEN}2.${NC} Создать сервер"
-        echo "  ${GREEN}3.${NC} Добавить клиента"
-        echo "  ${GREEN}4.${NC} Удалить клиента"
-        echo "  ${GREEN}5.${NC} Список клиентов"
-        echo "  ${GREEN}6.${NC} Показать QR-код клиента"
-        echo "  ${GREEN}7.${NC} Показать конфиг клиента"
-        echo "  ${GREEN}8.${NC} Скачать конфиг (HTTP 120 сек)"
-        echo "  ${GREEN}9.${NC} Статус сервера"
-        echo "  ${RED}0.${NC} Выход"
-        echo ""
+        printf "  ${GREEN}1.${NC} Установить AmneziaWG\n"
+        printf "  ${GREEN}2.${NC} Создать сервер\n"
+        printf "  ${GREEN}3.${NC} Добавить клиента\n"
+        printf "  ${GREEN}4.${NC} Удалить клиента\n"
+        printf "  ${GREEN}5.${NC} Список клиентов\n"
+        printf "  ${GREEN}6.${NC} Показать QR-код клиента\n"
+        printf "  ${GREEN}7.${NC} Показать конфиг клиента\n"
+        printf "  ${GREEN}8.${NC} Скачать конфиг (HTTP 120 сек)\n"
+        printf "  ${GREEN}9.${NC} Статус сервера\n"
+        printf "  ${RED}0.${NC} Выход\n"
+        printf "\n"
         printf "Выбор: "
         read choice
 
