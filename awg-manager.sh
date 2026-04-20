@@ -2,7 +2,7 @@
 # awg-manager - AmneziaWG server manager for OpenWrt
 # https://github.com/sysbedlam/awg-manager
 
-VERSION="1.0.3"
+VERSION="1.1.2"
 CLIENTS_DIR="/etc/awg-manager/clients"
 CONFIG_FILE="/etc/awg-manager/server.conf"
 AWG_IFACE="awg_srv"
@@ -46,18 +46,18 @@ is_awg_installed() {
 }
 
 get_server_ip() {
-    ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1
+    ip route get 1.1.1.1 2>/dev/null | grep -o 'src [0-9.]*' | awk '{print $2}' | head -1
 }
 
 random_int() {
     local min=$1
     local max=$2
-    local rand=$(cat /dev/urandom | tr -dc '0-9' | head -c 9)
+    local rand=$(hexdump -n 4 -e '"%u"' /dev/urandom)
     echo $(( min + rand % (max - min + 1) ))
 }
 
 random_token() {
-    cat /dev/urandom | tr -dc 'a-z0-9' | head -c 16
+    cat /dev/urandom 2>/dev/null | tr -dc 'a-z0-9' 2>/dev/null | head -c 16
 }
 
 # ─────────────────────────────────────────
@@ -84,6 +84,11 @@ ANSWERS
     fi
 
     print_ok "AmneziaWG установлен"
+
+    print_info "Установка uhttpd..."
+    opkg update > /dev/null 2>&1
+    opkg install uhttpd > /dev/null 2>&1
+    print_ok "uhttpd установлен"
 }
 
 # ─────────────────────────────────────────
@@ -103,7 +108,7 @@ create_server() {
         print_warn "Сервер уже создан."
         printf "Пересоздать? (y/n): "
         read answer
-        [ "$answer" != "y" ] && return 0
+        [ "$answer" != "y" ] && [ "$answer" != "Y" ] && return 0
         # Remove existing
         uci delete network.$AWG_IFACE 2>/dev/null
         uci commit network
@@ -201,6 +206,7 @@ SERVER_PUB_KEY=$PUB_KEY
 SERVER_PRIV_KEY=$PRIV_KEY
 SERVER_PORT=$PORT
 SERVER_IP=$SERVER_IP
+SERVER_EXT_IP=$(get_server_ip)
 SUBNET_BASE=$DEFAULT_SUBNET
 JC=$JC
 JMIN=$JMIN
@@ -214,22 +220,25 @@ H4=$H4
 EOF
 
     # Apply
+    dmesg -n 1
     service network restart > /dev/null 2>&1
     service firewall restart > /dev/null 2>&1
     sleep 2
     ifdown $AWG_IFACE > /dev/null 2>&1
     ifup $AWG_IFACE > /dev/null 2>&1
+    sleep 3
+    dmesg -n 7
 
-    echo ""
+    printf "\n"
     print_ok "Сервер создан!"
-    echo ""
+    printf "\n"
     printf "  Публичный ключ : ${GREEN}$PUB_KEY${NC}\n"
     printf "  Порт           : ${GREEN}$PORT${NC}\n"
     printf "  Туннель        : ${GREEN}$SERVER_IP/24${NC}\n"
     printf "  Jc/Jmin/Jmax   : ${GREEN}$JC / $JMIN / $JMAX${NC}\n"
     printf "  S1/S2          : ${GREEN}$S1 / $S2${NC}\n"
     printf "  H1/H2/H3/H4   : ${GREEN}$H1 / $H2 / $H3 / $H4${NC}\n"
-    echo ""
+    printf "\n"
 }
 
 # ─────────────────────────────────────────
@@ -260,11 +269,17 @@ add_client() {
 
     . $CONFIG_FILE
 
-    printf "Имя клиента (например phone, laptop): "
+    printf "Имя клиента (только латиница, например phone, laptop): "
     read CLIENT_NAME
 
     if [ -z "$CLIENT_NAME" ]; then
         print_err "Имя не может быть пустым"
+        return 1
+    fi
+
+    # Check for cyrillic or spaces
+    if echo "$CLIENT_NAME" | grep -qE '[^a-zA-Z0-9_-]'; then
+        print_err "Имя должно содержать только латинские буквы, цифры, _ и -"
         return 1
     fi
 
@@ -289,7 +304,7 @@ add_client() {
     CLIENT_PSK=$(awg genpsk)
 
     # Get server external IP
-    EXT_IP=$(get_server_ip)
+    EXT_IP=$SERVER_EXT_IP
 
     # Create client config
     cat > $CLIENTS_DIR/$CLIENT_NAME.conf << EOF
@@ -325,22 +340,21 @@ EOF
     uci commit network
 
     # Restart interface
+    dmesg -n 1
     ifdown $AWG_IFACE > /dev/null 2>&1
     ifup $AWG_IFACE > /dev/null 2>&1
+    sleep 2
+    dmesg -n 7
 
-    echo ""
+    printf "\n"
     print_ok "Клиент '${GREEN}$CLIENT_NAME${NC}' создан!"
-    echo "  IP в туннеле : ${GREEN}$CLIENT_IP${NC}"
-    echo ""
-
-    # Show QR
-    show_qr_by_name $CLIENT_NAME
+    printf "  IP в туннеле : ${GREEN}$CLIENT_IP${NC}\n"
+    printf "\n"
 
     # Offer download
-    echo ""
     printf "Открыть ссылку для скачивания конфига? (y/n): "
     read ans
-    [ "$ans" = "y" ] && serve_client_config $CLIENT_NAME
+    [ "$ans" = "y" ] || [ "$ans" = "Y" ] && serve_client_config $CLIENT_NAME
 }
 
 # ─────────────────────────────────────────
@@ -348,11 +362,17 @@ EOF
 # ─────────────────────────────────────────
 
 delete_client() {
-    echo ""
+    printf "\n"
     list_clients
-    echo ""
-    printf "Имя клиента для удаления: "
-    read CLIENT_NAME
+    printf "\n"
+    printf "Имя или номер клиента для удаления: "
+    read INPUT
+
+    CLIENT_NAME=$(resolve_client "$INPUT")
+    if [ -z "$CLIENT_NAME" ]; then
+        print_err "Клиент не найден"
+        return 1
+    fi
 
     if [ ! -f "$CLIENTS_DIR/$CLIENT_NAME.conf" ]; then
         print_err "Клиент '$CLIENT_NAME' не найден"
@@ -361,7 +381,7 @@ delete_client() {
 
     printf "${RED}Удалить клиента '$CLIENT_NAME'? (y/n):${NC} "
     read confirm
-    [ "$confirm" != "y" ] && return 0
+    [ "$confirm" != "y" ] && [ "$confirm" != "Y" ] && return 0
 
     # Remove UCI peer
     local PEER_ID="awg_peer_$(echo $CLIENT_NAME | tr -cd 'a-zA-Z0-9_')"
@@ -372,8 +392,11 @@ delete_client() {
     rm -f "$CLIENTS_DIR/$CLIENT_NAME.conf"
 
     # Restart interface
+    dmesg -n 1
     ifdown $AWG_IFACE > /dev/null 2>&1
     ifup $AWG_IFACE > /dev/null 2>&1
+    sleep 2
+    dmesg -n 7
 
     print_ok "Клиент '$CLIENT_NAME' удалён"
 }
@@ -400,6 +423,28 @@ list_clients() {
         i=$((i+1))
     done
     echo ""
+}
+
+# ─────────────────────────────────────────
+# RESOLVE CLIENT NAME FROM INPUT
+# ─────────────────────────────────────────
+
+resolve_client() {
+    local INPUT=$1
+    if echo "$INPUT" | grep -qE '^[0-9]+$'; then
+        local i=1
+        for f in $CLIENTS_DIR/*.conf; do
+            [ -f "$f" ] || return 1
+            if [ $i -eq $INPUT ]; then
+                basename $f .conf
+                return 0
+            fi
+            i=$((i+1))
+        done
+        return 1
+    else
+        echo "$INPUT"
+    fi
 }
 
 # ─────────────────────────────────────────
@@ -440,10 +485,16 @@ show_qr() {
 # ─────────────────────────────────────────
 
 show_config() {
-    echo ""
+    printf "\n"
     list_clients
-    printf "Имя клиента: "
-    read name
+    printf "Имя или номер клиента: "
+    read INPUT
+
+    local name=$(resolve_client "$INPUT")
+    if [ -z "$name" ]; then
+        print_err "Клиент не найден"
+        return 1
+    fi
 
     local conf="$CLIENTS_DIR/$name.conf"
     if [ ! -f "$conf" ]; then
@@ -451,7 +502,7 @@ show_config() {
         return 1
     fi
 
-    echo ""
+    printf "\n"
     print_info "Конфиг $name:"
     printf "${CYAN}────────────────────────────────────────${NC}\n"
     cat "$conf"
@@ -467,8 +518,13 @@ serve_client_config() {
 
     if [ -z "$CLIENT_NAME" ]; then
         list_clients
-        printf "Имя клиента: "
-        read CLIENT_NAME
+        printf "Имя или номер клиента: "
+        read INPUT
+        CLIENT_NAME=$(resolve_client "$INPUT")
+        if [ -z "$CLIENT_NAME" ]; then
+            print_err "Клиент не найден"
+            return 1
+        fi
     fi
 
     local conf="$CLIENTS_DIR/$CLIENT_NAME.conf"
@@ -477,15 +533,24 @@ serve_client_config() {
         return 1
     fi
 
-    local EXT_IP=$(get_server_ip)
+    . $CONFIG_FILE
+    local EXT_IP=$SERVER_EXT_IP
+    [ -z "$EXT_IP" ] && EXT_IP=$(get_server_ip)
+
     local PORT=$(random_int 20000 60000)
     local TOKEN=$(random_token)
     local SERVE_DIR="/tmp/awg_serve_$$"
-    local TIMEOUT=120
 
-    # Prepare directory with token subdir
-    mkdir -p "$SERVE_DIR/$TOKEN"
-    cp "$conf" "$SERVE_DIR/$TOKEN/$CLIENT_NAME.conf"
+    # Prepare CGI script
+    mkdir -p "$SERVE_DIR/cgi-bin"
+    cat > "$SERVE_DIR/cgi-bin/dl" << CGEOF
+#!/bin/sh
+printf "Content-Type: application/octet-stream\r\n"
+printf "Content-Disposition: attachment; filename=\"$CLIENT_NAME.conf\"\r\n"
+printf "\r\n"
+cat "$conf"
+CGEOF
+    chmod +x "$SERVE_DIR/cgi-bin/dl"
 
     # Open firewall port temporarily
     uci add firewall rule > /dev/null
@@ -498,24 +563,20 @@ serve_client_config() {
     uci commit firewall
     service firewall restart > /dev/null 2>&1
 
-    # Start busybox httpd
-    busybox httpd -f -p $PORT -h "$SERVE_DIR" &
+    # Start uhttpd with CGI
+    uhttpd -p $PORT -h "$SERVE_DIR" -x /cgi-bin &
     HTTPD_PID=$!
 
-    echo ""
-    print_ok "Ссылка для скачивания (действует ${TIMEOUT} сек):"
-    echo ""
-    echo "  ${GREEN}http://$EXT_IP:$PORT/$TOKEN/$CLIENT_NAME.conf${NC}"
-    echo ""
-
-    # Countdown
-    i=$TIMEOUT
-    while [ $i -gt 0 ]; do
-        printf "\r  ${YELLOW}Осталось: %3d сек...${NC}" $i
-        sleep 1
-        i=$((i-1))
-    done
-    echo ""
+    printf "\n"
+    print_ok "Ссылка для скачивания:"
+    printf "\n"
+    printf "  ${GREEN}http://$EXT_IP:$PORT/cgi-bin/dl${NC}\n"
+    printf "\n"
+    printf "  Скопируй ссылку: http://$EXT_IP:$PORT/cgi-bin/dl\n"
+    printf "  Конфиг сохранён: ${BLUE}$conf${NC}\n"
+    printf "\n"
+    printf "Нажми ${YELLOW}Enter${NC} когда скачаешь — ссылка закроется: "
+    read dummy
 
     # Cleanup
     kill $HTTPD_PID 2>/dev/null
@@ -561,10 +622,9 @@ main_menu() {
         printf "  ${GREEN}3.${NC} Добавить клиента\n"
         printf "  ${GREEN}4.${NC} Удалить клиента\n"
         printf "  ${GREEN}5.${NC} Список клиентов\n"
-        printf "  ${GREEN}6.${NC} Показать QR-код клиента\n"
-        printf "  ${GREEN}7.${NC} Показать конфиг клиента\n"
-        printf "  ${GREEN}8.${NC} Скачать конфиг (HTTP 120 сек)\n"
-        printf "  ${GREEN}9.${NC} Статус сервера\n"
+        printf "  ${GREEN}6.${NC} Показать конфиг клиента\n"
+        printf "  ${GREEN}7.${NC} Скачать конфиг (HTTP 120 сек)\n"
+        printf "  ${GREEN}8.${NC} Статус сервера\n"
         printf "  ${RED}0.${NC} Выход\n"
         printf "\n"
         printf "Выбор: "
@@ -576,11 +636,10 @@ main_menu() {
             3) add_client ;;
             4) delete_client ;;
             5) list_clients ;;
-            6) show_qr ;;
-            7) show_config ;;
-            8) serve_client_config ;;
-            9) server_status ;;
-            0) echo ""; print_ok "Пока!"; echo ""; exit 0 ;;
+            6) show_config ;;
+            7) serve_client_config ;;
+            8) server_status ;;
+            0) printf "\n"; print_ok "Пока!"; printf "\n"; exit 0 ;;
             *) print_err "Неверный выбор" ;;
         esac
 
